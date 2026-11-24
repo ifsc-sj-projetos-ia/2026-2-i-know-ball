@@ -54,6 +54,17 @@ def baixar(destino=CSV_JOGOS):
     return bruto
 
 
+def atualizar(destino=CSV_JOGOS):
+    """Rebaixa só a temporada atual e troca essas linhas no CSV (as temporadas fechadas não mudam)."""
+    atual = temporada_atual()
+    nova = pd.concat([_baixar_temporada(atual, tipo) for tipo in TIPOS], ignore_index=True)
+    nova = nova.dropna(subset=["WL"])
+    bruto = pd.read_csv(destino, dtype={"GAME_ID": str})
+    bruto = pd.concat([bruto[bruto["TEMPORADA"] != nova["TEMPORADA"].iloc[0]], nova], ignore_index=True)
+    bruto.sort_values(["GAME_DATE", "GAME_ID"]).to_csv(destino, index=False)
+    print(f"{len(nova) // 2} jogos da temporada atual atualizados em {destino}")
+
+
 def montar_jogos(bruto):
     """Junta as 2 linhas de cada jogo numa só: colunas _m (mandante) e _v (visitante)."""
     bruto = bruto[bruto["TIPO"] == "Regular Season"].copy()

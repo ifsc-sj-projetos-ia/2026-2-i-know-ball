@@ -1,7 +1,8 @@
 """Linha de comando: uv run iknowball <comando>"""
 import argparse
+from datetime import date
 
-from iknowball import dados, features, modelo
+from iknowball import dados, features, modelo, previsao
 
 
 def cmd_baixar(_args):
@@ -62,6 +63,39 @@ def cmd_treinar(_args):
         print(f"  {nome:<14} {peso:+.3f}")
 
 
+def cmd_ablation(_args):
+    partes = modelo.dividir(features.montar_tabela(dados.carregar_jogos()))
+    res = modelo.ablation(partes["treino"], partes["validacao"])
+    base = res["todas as 8"]
+    print(f"{'na validação':<36} {'acerto':>7} {'log_loss':>9} {'Δ log_loss':>11}")
+    for nome, m in res.items():
+        if nome == "só Elo":
+            print()
+        print(f"{nome:<36} {m['acerto']:>7.1%} {m['log_loss']:>9.4f} {m['log_loss'] - base['log_loss']:>+11.4f}")
+    print("\nΔ positivo = piorou sem o grupo (ele ajudava). Perto de zero = não faz falta.")
+
+
+def cmd_prever(args):
+    dia = date.fromisoformat(args.data) if args.data else previsao.amanha()
+    dados.atualizar()
+    prev = previsao.prever_dia(dia)
+    if prev.empty:
+        print(f"Nenhum jogo ainda não começado em {dia:%d/%m/%Y}.")
+        return
+
+    print(f"\nJogos de {dia:%d/%m/%Y}:")
+    for p in prev.itertuples():
+        cansado = [t for t, b in ((p.mandante, p.b2b_m), (p.visitante, p.b2b_v)) if b]
+        nota = f"  (jogou ontem: {', '.join(cansado)})" if cansado else ""
+        nota += "  (quadra neutra)" if p.neutro else ""
+        print(f"  {p.visitante} @ {p.mandante}:  {p.favorito} {p.prob_favorito:.0%}{nota}")
+
+    print(f"\nVitórias esperadas dos favoritos: {prev['prob_favorito'].sum():.1f} de {len(prev)}")
+    print(f"Chance de TODOS os favoritos vencerem: {previsao.todos_favoritos(prev):.1%}")
+    previsao.salvar(prev)
+    print(f"Previsão guardada em {previsao.CSV_PREVISOES.relative_to(dados.RAIZ)}")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="iknowball", description="Previsão de jogos da NBA")
     sub = parser.add_subparsers(required=True, metavar="comando")
@@ -69,6 +103,10 @@ def main():
     sub.add_parser("resumo", help="mostra os jogos por temporada e o mando de quadra").set_defaults(func=cmd_resumo)
     sub.add_parser("elo", help="calcula o Elo, mede o acerto por temporada e mostra o ranking atual").set_defaults(func=cmd_elo)
     sub.add_parser("treinar", help="treina a logística e compara com os baselines na validação").set_defaults(func=cmd_treinar)
+    sub.add_parser("ablation", help="tira um grupo de features por vez e mede o impacto").set_defaults(func=cmd_ablation)
+    p = sub.add_parser("prever", help="prevê os jogos de um dia (padrão: amanhã) e guarda a previsão")
+    p.add_argument("--data", help="AAAA-MM-DD")
+    p.set_defaults(func=cmd_prever)
     args = parser.parse_args()
     args.func(args)
 

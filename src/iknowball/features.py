@@ -48,11 +48,14 @@ def calcular_elo(jogos):
 JANELA = 10  # últimos N jogos para forma e eficiência (atravessa a virada de temporada)
 DESCANSO_MAX = 3  # 3 dias ou mais de folga contam igual
 
-COLUNAS_MODELO = ["dif_elo", "dif_saldo10", "dif_ataque10", "dif_defesa10",
-                  "descanso_m", "descanso_v", "b2b_m", "b2b_v"]
+# Todas as features calculadas. O ablation mostrou que só 4 fazem diferença (ver COLUNAS_MODELO).
+COLUNAS_CANDIDATAS = ["dif_elo", "dif_saldo10", "dif_ataque10", "dif_defesa10",
+                      "descanso_m", "descanso_v", "b2b_m", "b2b_v"]
+# Fora: ataque/defesa10 repetem o saldo10 (saldo = ataque - defesa) e descanso repete o b2b.
+COLUNAS_MODELO = ["dif_elo", "b2b_m", "b2b_v", "dif_saldo10"]
 
 
-def _por_time(jogos):
+def por_time(jogos):
     """Transforma 1 linha por jogo em 1 linha por time por jogo, do ponto de vista de cada time."""
     # Posses estimadas: arremessos - rebote ofensivo + perda de bola + 0,44 x lances livres. Média dos dois lados.
     posses = sum(jogos[f"fga_{s}"] - jogos[f"oreb_{s}"] + jogos[f"tov_{s}"] + 0.44 * jogos[f"fta_{s}"]
@@ -73,7 +76,7 @@ def _por_time(jogos):
 
 def calcular_janelas(jogos):
     """Forma, eficiência e descanso de cada time ANTES de cada jogo."""
-    t = _por_time(jogos)
+    t = por_time(jogos)
     g = t.groupby("time")
     for col in ("saldo", "ataque", "defesa"):
         # shift(1): tira o próprio jogo da conta. Sem isso o modelo veria o resultado que deveria prever.
@@ -94,4 +97,4 @@ def montar_tabela(jogos):
     tab["dif_elo"] = tab["elo_m"] - tab["elo_v"]  # sem bônus de mando: o modelo aprende quanto vale jogar em casa
     for col in ("saldo10", "ataque10", "defesa10"):
         tab[f"dif_{col}"] = tab[f"{col}_m"] - tab[f"{col}_v"]
-    return tab.dropna(subset=COLUNAS_MODELO)  # só cai o 1º jogo de cada time em 2014-15
+    return tab.dropna(subset=COLUNAS_CANDIDATAS)  # só cai o 1º jogo de cada time em 2014-15
