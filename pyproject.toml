@@ -1,0 +1,26 @@
+[project]
+name = "iknowball"
+version = "0.1.0"
+description = "Previsão de jogos da NBA e simulação do título"
+requires-python = ">=3.13"
+dependencies = [
+    "nba-api>=1.12.0",
+    "pandas>=3.1.1",
+    "scikit-learn>=1.9.1",
+]
+
+[project.scripts]
+iknowball = "iknowball.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
